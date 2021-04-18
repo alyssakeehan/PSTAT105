@@ -1,0 +1,86 @@
+---
+title: "HW1 cont."
+author: "Alyssa Keehan"
+date: "1/9/2021"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(kableExtra)
+library(tinytex)
+library(selectr)
+library(tidyr)
+```
+
+```{r}
+compensation <- scan("compensation.txt",n=170,skip=3)
+compensation
+```
+
+## A
+# Draw a Histogram
+```{r}
+hist(compensation)
+```
+
+## B
+# Experiment With a Different Number of Bins
+```{r}
+# 35 bins
+hist(compensation, breaks = 35, col = "lightgreen", border = "darkgreen")
+# 100 bins
+hist(compensation, breaks = 100, col = "lightgreen", border = "darkgreen")
+```
+
+Based off of my results of the top 3 histograms, I think the histogram with 35 bins does the best job of illustrating the data set. Although the histogram with 100 bins shows every increment detail in the data, the right hand side looks pretty awkward with no obvious sign of decrease towards the end of the graph. As for the default historgram, it is too general and needs to be split more to see the little details. It shows that the range between 50,000 and 60,000 has the largest frequency but spliting that range into different bins would be helpful to look at. The histogram with 35 bins does a good job of not being too specific or too general. You can easily see the range with the largest frequencies and that the ranges are not that large where the values could be invisible. In addition, the right end of the graph shows a less awkward decrease in frequencies. 
+
+## C
+# Explain the Confidence Interval Calculated Using the Given Code
+```{r}
+t.stat <- t.test(compensation, conf.level = 0.95)
+t.stat
+```
+
+This concern comes from the fact that this confidence interval is being calculated as if it is a noraml distribution. However, looking at the histogram, we can see that the plot is skewed to the right. 
+
+Looking at the histogram and the result of the confidence interval for the compensations, a concern also arises with the small range for a 95% confidence interval. Based off of the result, we would be 95% confident that the true mean of X is between 61,381.55 and 65001.70 dollars. That is only a range of 4000 dollars. This is a bit misleading since the histogram shows a different outcome.For example, looking at the bin with the highest frequency (approximately 20 values lie between 52,000 and 54,000), knowing that the sample size is 170, that small bin makes up about 11% of the data. Since the confidence interval doesn't include either of those values, the calculated condifence inteval isn't correct. A 95% confidence interval should strive to contain all but 5% of the outside data. Seeing that at least 11% of the data isn't contained and also on just one side signals a cause for concern. 
+
+
+## D
+```{r}
+mean(compensation <= 50000)
+```
+
+This command returns the percentile of the value of compensation being below 50,000. In other words, the probability that a compensation value in this sample is under 50,000 is approximately 0.04117 . We could use this result to act as a criteria for significantly different values (since the value is less than 0.05). This means that from this value and below, it is significantly different from the mean and any hypothesis testing an equality would be rejected.
+
+## E
+# Perform a Test to Determine if 80,000 is 75th Percentile
+```{r}
+p <- mean(compensation <= 80000) 
+sd <- (0.75*(1-0.75))/170
+z_val <- (p-0.75)/sqrt(sd)
+1 - pnorm(z_val)
+```
+Ho: mean(compensation <= 80,000) = 0.75 i.e. 75th percentile of compensations is 80,000
+
+H1: mean(compensation <= 80,000) = 0.75 i.e. 75th percentile of compensations is not 80,000
+
+Under Ho:
+
+z = (mean(compensation <-= 80,000) - 0.75)/sqrt((0.75*(1-0.75))/170)
+
+z = 5.048005
+
+Using pnorm, we get a p-value of 2.232239e-07.
+
+With a p-value of 2.232239e-07 < alpha = 0.05, we reject the null hypothesis. We have significant evidence to conclude that the 75th percentile of compensations is not 80,000. The value we got from the sample compensations for mean(compensation <= 80,000) is approximately 0.918 which means that a compensation value of 80,000 is at the 91.8% percentile. It is much farther from the median than expected. this can be applied to the population as well, that a compensation value of 80,000 is pretty high compared the the median.
+
+## Works Cited
+
+1. https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/chisq.test (part 1c)
+2. https://stat.ethz.ch/R-manual/R-devel/library/base/html/strtoi.html (part 4A)
+

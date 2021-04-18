@@ -1,0 +1,152 @@
+---
+title: "HW6"
+author: "Alyssa Keehan"
+date: "2/21/2021"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+library(nortest)
+library(dplyr)
+library(ggplot2)
+library(base)
+```
+```{r}
+salaries <- read.csv("SBUnifSalaries.txt", sep = " ")
+head(salaries)
+totalPay <- salaries$TotalPay
+```
+
+# Question 1
+## Create a histogram of this data with a reasonable number of bins that allows you to see the characteristics of the data.
+```{r}
+hist(totalPay, breaks = 100, freq = FALSE, col = "wheat", border = "blue")
+```
+Using 100 breaks, you can see 4 peaks, one at the lower end of the salary data, one between 30,000 to 40,0000 dollars, another smaller peak between around 60,000-70,000 dollars and another around 80,000 to 100,000 dollars.
+
+# Question 2
+## Draw a kernel density estimate using the normal reference density algorithm for choosing the bandwidth.
+```{r}
+hist(totalPay, breaks = 100, freq = FALSE, col = "wheat", border = "blue", 
+     main = "Total pay with nrd Bandwidth estimate")
+nrd_dens <- density(totalPay, bw = "nrd", kernel = "gaussian")
+lines(nrd_dens, col = "red", lw = 2)
+```
+
+# Question 3
+## Draw a kernel density estimate using the cross validation algorithm. Which bandwidth do you think is better?
+```{r}
+hist(totalPay, breaks = 100, freq = FALSE, col = "wheat", border = "blue", 
+     ylim = c(0,0.0000195), main = "Total pay with ucv Bandwidth estimate")
+ucv_dens <- density(totalPay, bw = "ucv", kernel = "gaussian")
+lines(ucv_dens, col = "red", lw = 2)
+```
+While the NRD kernel density estimate is smooth and has low variance, it is very biased. On the other hand, UCV is furry, has low bias but very high variance. In terms of which one is better, the UCV one does the best job at highlighting the details of the data. The individual peaks are more present using this density estimate as opposed to the NRD bandwidth. 
+
+# Question 4
+## Sheather's paper recommends using a different algorithm which gets a more refined version of the second derivative to plug into the AIMSE. This is implemented via the bandwidth algorithm "SJ" in the density function. Use this option to find a bandwidth and comment on whether you agree that this method is working better for this data.
+```{r}
+hist(totalPay, breaks = 100, freq = FALSE, col = "wheat", border = "blue", 
+     ylim = c(0,0.0000195), main = "Total Pay with sj Bandwidth estimate")
+sj_dens <- density(totalPay, bw = "sj", kernel = "gaussian")
+lines(sj_dens, col = "red", lw = 2)
+```
+From the result stated above, it looks like it handles the Bias Variance tradeoff better than the two other automatic bandwidths. It picks up the densities of the peaks as well as highlights the dips in the data. I think this kernel density estimate for bandwidth works the best out of the three automatic calculated ones we've used so far. 
+
+# Question 5
+## Salary data like this data set is often skewed towards higher values. One way to make the data look more symmetric is to apply a log transform. Draw a histogram of the logs of the salaries.
+```{r}
+log_sals <- log(totalPay)
+hist(log_sals, breaks = 60, freq = FALSE, col = "wheat", border = "blue")
+```
+
+# Question 6
+## Perform a Lilliefors test on the log-transformed data. Is it reasonable to assume that this data is normally distributed?
+```{r}
+lillie.test(log_sals)
+```
+Ho: The log salaries of all employees in the SBCSD follow a normal distribution.
+
+H1: The log salaries of all employees in the SBCSD do not follow a normal distribution.
+
+Under Ho, the test statistic D = 0.13609 and out p-value < 2.2e-16.
+
+Based on the results from the Lilliefors test, we are receiving a p-value significantly less than alpha = 0.05. So, we reject the null hypothesis that the data is normally distributed. 
+
+# Question 7
+## Draw an appropriate density estimate on your histogram of the transformed data, and comment on ways in which it appears non-Gaussian.
+```{r}
+hist(log_sals, breaks = 60, freq = FALSE, col = "wheat", border = "blue", 
+     ylim = c(0,1.2), main = "Log of Total Pay With Different Bandwidths")
+log_ucvbw <- density(log_sals, bw = "ucv", kernel = "gaussian")
+lines(log_ucvbw, col = "orange", lw = 3)
+log_sjbw <- density(log_sals, bw = "sj", kernel = "gaussian")
+lines(log_sjbw, col = "green", lw = 2)
+log_nrdbw <- density(log_sals, bw = "nrd", kernel = "gaussian")
+lines(log_nrdbw, col = "blue", lw = 2)
+legend(4, 0.8, legend = c("ucv = 0.02802081","sj = 0.05055257","nrd = 0.1908628"), 
+       col = c("orange","green","blue"), lwd = c(4,4,4), title = "Automatic Bandwidths")
+```
+```{r}
+hist(log_sals, breaks = 60, freq = FALSE, col = "wheat", border = "blue", 
+     ylim = c(0,1.2), main = "Log of Total Pay using bw = 0.10")
+log_dens <- density(log_sals, bw = 0.10, kernel = "gaussian")
+lines(log_dens, col = "red", lw = 2)
+```
+The value for bandwidth I used for drawing the density estimate was 0.10. After looking at the automatic bandwidths, I wanted to use a value that was in between the nrd and sj calculated bandwidths. I thought the sj value had too much variance while the nrd value had too much bias. With a bandwidth of 0.10, you can see both the main peaks as well as the small little peaks around the large peaks and the obvious low points in density. This distribution appears to be non-Gaussian because of the two peaks, lack of negative values and it is skewed to the left.
+
+# Question 8 
+## One issue with the data is that it includes employees with many different sorts of jobs from Substitute Teachers to the Superintendent. Separate out just the folks that are Teachers and plot a histogram of their salaries. Would a log transform be appropriate to make the distribution of this data look more symmetric?
+```{r}
+# subset the data with just those with Teachers in the JobTitle
+teachers <- salaries %>% filter(JobTitle == "TEACHER")
+teacher_totalPay <- teachers$TotalPay
+hist(teacher_totalPay, freq = FALSE, breaks = 45, col = "wheat", 
+     border = "blue",main = "Histogram of Teacher Total Pay")
+log_teach <- log(teacher_totalPay)
+hist(log_teach, freq = FALSE, breaks = 45, col = "wheat", border = "blue",
+     main = "Histogram of Log Teacher Total Pay")
+```
+Comparing the histograms of the regular teacher pay and the log of teacher pay, it looks as though the Log of teacher pay has an obvious mean peak value and a large range of small densities far away from the center. The normal Total Pay histogram has three both rounded and pointy peaks and a lot of variety, so we cannot tell where the true mean would lie. So in terms of symmetry, the log transformation does create a bit of a more symmatric curve than the untransformed teacher salaries. 
+
+# Question 9
+## Using the "SJ" method to choose a bandwidth, draw an appropriate density estimate on this histogram. Also indicate the median teacher salary on the plot.
+```{r}
+hist(teacher_totalPay, freq = FALSE, breaks = 45, col = "wheat", border = "blue",
+     main = "Histogram of Teacher Total Pay, median = $81,920.04")
+teach_dens <- density(teacher_totalPay, bw = "sj", kernel = "gaussian")
+lines(teach_dens, col = "red", lw = 2)
+abline(v = median(teacher_totalPay), col = "blue", lw = 2)
+```
+
+# Question 10
+## The California Department of Education website reports that the median salary for teachers in California is $83,059. Perform a nonparametric test of whether or not the median salary for teachers in Santa Barbara Unified School District is the same as for the whole state. What do you conclude?
+
+```{r}
+# using the empirical median
+thetahat <- mean(teacher_totalPay < 83059)
+thetahat # 0.5034483
+z <- (thetahat - 0.5)/sqrt((0.5^2)/length(teacher_totalPay))
+z # 0.166091
+pvalue <- 2*(1-pnorm(z))
+pvalue # 0.8680854
+```
+Ho: median of Santa Barbara County is the same as the whole state ($83059)
+
+H1: median of Santa Barbara County is not the same as the whole state ($83059)
+
+Using the Empirical Median Nonparametric test, we get a Z value of  0.166091 and a p-value of 0.8680854.
+
+With a p-value greater than alpha = 0.05, we fail to reject the null hypothesis. We do not have significant enough evidence to conclude that the true median of teacher salaries in Santa Barbara County is not the same as the median of the whole state ($83,059). 
+
+
+
+
+

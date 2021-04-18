@@ -1,0 +1,111 @@
+---
+title: "HW5"
+author: "Alyssa Keehan"
+date: "2/15/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+```
+
+# Question 3
+```{r}
+contributions <- read.table("Carbajal.txt", header = TRUE)
+head(contributions)
+donations <- contributions$Donation
+```
+
+## A. Create a histogram that allows us to see the details of the data
+```{r}
+donations_hist <- hist(donations, breaks = 50, freq = FALSE, col = "wheat", border = "purple")
+```
+
+## B. Plot Density Estimate on top
+```{r}
+hist(donations, breaks = 50, freq = FALSE, col = "wheat", border = "purple")
+don_dens <- density(donations, bw = 30, kernel = "gaussian")
+lines(don_dens, col = "darkgreen", lw = 2)
+```
+
+## C. Repeat with Rectangular and Epanechnikov
+```{r}
+hist(donations, breaks = 50, freq = FALSE, col = "wheat", border = "purple")
+# rectangular kernel
+don_dens1 <- density(donations, bw = 30, kernel = "rectangular")
+lines(don_dens1, col = "blue", lw = 3)
+# epanchnikov kernel
+don_dens2 <- density(donations, bw = 30, kernel = "epanechnikov")
+lines(don_dens2, col = "red", lw = 2)
+legend(3500, 0.002, legend = c("Rectangular","Epanechnikov"), col = c("blue","red"), 
+       lwd = c(4,4), title = "Kernel Types")
+```
+
+## D. What difference does the kernel shape make?
+The difference between the kernel shapes is that the rectangular kernel shows more sharp changes in density at the peaks while the epanchnikov kernel is more curvy.  EPAN is more smoother than retangular kernel. Compared to rectangular, the epan is more focused at the center (higher at peaks and lower at dips) rectagular is more biased because the other is more exaggerated in the dips and peaks.
+
+## E. Produce another plot with the automated bandwidth options
+```{r}
+hist(donations, breaks = 50, freq = FALSE, col = "wheat", border = "purple")
+# ucv
+don_dens1 <- density(donations, bw = "ucv", kernel = "gaussian")
+lines(don_dens1, col = "blue", lw = 3)
+# nrd
+don_dens2 <- density(donations, bw = "nrd", kernel = "gaussian")
+lines(don_dens2, col = "red", lw = 2)
+legend(3500, 0.002, legend = c("ucv","nrd"), col = c("blue","red"), 
+       lwd = c(4,4), title = "Bandwidths")
+```
+
+## F. Find a bandwidth for the denisty estimate that you think works best and estimate the density at $50 and $1500
+
+```{r}
+hist(donations, breaks = 50, freq = FALSE, col = "wheat", border = "purple")
+# best bandwidth
+don_dens4 <- density(donations, bw = 25, kernel = "gaussian")
+lines(don_dens4, col = "red", lw = 3)
+don_dens5 <- density(donations, bw = 50, kernel = "gaussian")
+lines(don_dens5, col = "green", lw = 3)
+don_dens6 <- density(donations, bw = 75, kernel = "gaussian")
+lines(don_dens6, col = "blue", lw = 2)
+don_dens7 <- density(donations, bw = 100, kernel = "gaussian")
+lines(don_dens7, col = "black", lw = 1)
+legend(3500, 0.002, legend = c("25","50","75","100"), 
+       col = c("red","green","blue","black"), 
+       lwd = c(4,4,4,4), title = "Bandwidths")
+hist(donations, breaks = 50, freq = FALSE, col = "wheat",
+     border = "purple", main = "Best BW size = 75")
+lines(don_dens6, col = "blue", lw = 2)
+```
+
+Based on the graph above a bandwidth of 75 does a good job of highlighting the notable peaks in the data. In addition, I think it does a good job of maintaining a good tradeoff between bias and variance. It isn't too furry, but it's also not too smooth. 
+
+```{r}
+bw <- don_dens6$bw
+bw
+# approximate density for $50 donations
+density(donations,bw = bw, kernel = "gaussian", from = 50, to = 50)$y[1] # 0.001473208
+
+# approximate density for $1500 donations
+density(donations,bw = bw, kernel = "gaussian", from = 1500, to = 1500)$y[1] # 0.0001257415
+```
+
+Using a bandwidth of 75, our density estimate for 
+$50 is 0.001473208 and for 
+$1500 is 0.0001257415.
+
+
+## G. Does the shape of the kernel or the bandwidth have a greater effect on the resulting density estimate?
+The bandwidth has a greater effect on the resulting density estimate. When we look at part C where we have the same bandwidth but different kernels, the overall curve is the same, just more strict at some points. But when we look at part D where we change the bandwidth, but keep the kernel to be Gaussian, the denisty estimates are very different. This has to do with the bandwidth being the main contributor of the bias vairance trade off. 
+
+
+
+
+
+
+
+
+
+

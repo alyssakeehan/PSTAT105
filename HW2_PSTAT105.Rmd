@@ -1,0 +1,200 @@
+---
+title: "HW2"
+author: "Alyssa Keehan"
+date: "1/21/2021"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dbplyr)
+library(dplyr)
+```
+
+```{r}
+Bdays <- read.table("BBallBDays.txt")
+sells <- scan("Selltimes.txt")
+```
+
+# Question 2: Birthday Data
+## A. Plot the Birthday Month Frequencies
+```{r}
+Bdays$Month <- factor(Bdays$Month, levels = month.name)
+sum_months <- data.frame(table(Bdays$Month))
+colnames(sum_months) <- c("Month","Freq")
+ggplot(data = sum_months, aes(x = Month, y = Freq)) +
+  geom_bar(stat = "identity", fill = "orange", color = "purple")
+```
+
+## B. Perform a X^2 Test for equal distribution for each month
+```{r}
+total_obs <- sum(sum_months$Freq)
+exp_months <- total_obs/12
+print(c("Expectation:", toString(exp_months)))
+obs_months <- sum_months$Freq
+chi <- sum(((obs_months - exp_months)^2)/exp_months)
+print(c("Chi Squared Statistic:",toString(chi))) # Test Statistic
+qchisq(0.95, 11) # df = 12 - 1
+print(c("p-value:",toString(1 - pchisq(chi,11))))
+```
+
+Xi = # of players with a birthday in month i
+Ho: Xi = Xj (for every i != j)
+H1: Xi != Xj (for every i != j)
+Since our computed p-value is greater than alpha, we fail to reject the null hypothesis. We do not have enough evidence to conclude a difference between all Xi (i in [1,12]).
+
+## C. Only Include Newer Players (after 1/1/1955)
+```{r}
+new_Bdays <- Bdays %>%
+  filter(Year > 1954)
+head(new_Bdays)
+new_Bday_freq <- data.frame(table(new_Bdays$Month))
+new_Bday_freq
+
+# barplot of the month frequencies
+colnames(new_Bday_freq) <- c("Month","Freq")
+ggplot(data = new_Bday_freq, aes(x = Month, y = Freq)) +
+  geom_bar(stat = "identity", fill = "orange", color = "purple")
+
+new_total_obs <- sum(new_Bday_freq$Freq)
+new_exp_months <- new_total_obs/12
+print(c("Expectation:", toString(new_exp_months)))
+new_obs_months <- new_Bday_freq$Freq
+new_chi <- sum(((new_obs_months - new_exp_months)^2)/new_exp_months)
+print(c("Chi Squared Statistic:",toString(new_chi))) # Test Statistic
+qchisq(0.95, 11) # df = 12 - 1
+print(c("p-value:",toString(1 - pchisq(new_chi,11))))
+```
+With a p-value of 0.777 > alpha = 0.05, we fail to reject the null hypothesis. We do not have significant evidence to conclude a difference between the proportion of basketball player brithdays after 1955 is equal across all the months of the year. 
+
+## D. Chi Squared BasketBall vs. dist. of months in the year
+```{r}
+perm_mon <- c(31,28.25, 31,30,31,30,31,31,30,31,30,31)/365.25
+e.d <- nrow(new_Bdays)*perm_mon
+e.d
+mon_chi <- sum(((new_Bday_freq$Freq - e.d)^2)/e.d)
+mon_chi
+qchisq(0.95, 11)
+1 - pchisq(mon_chi, 11)
+```
+
+Since our computed  p-value of 0.4647 is greater than alpha = 0.05, we fail to reject our null hypothesis. We do not have enough evidence to conclude a difference in distribution between the Birthdays of famous Basketball players and the overall proportion of months in the year. 
+
+## E. Basketball Stars vs. common birthdays dist. 
+```{r}
+cdc <- c(0.0815, 0.0752,0.0837,0.0816,0.0859,0.0813,0.0883,0.0892,0.0866,0.0849,0.0787, 0.0830)
+cdc.e <- cdc*nrow(new_Bdays)
+cdc.e
+cdc_chi <- sum(((new_Bday_freq$Freq - cdc.e)^2)/cdc.e)
+cdc_chi
+qchisq(0.95, 11)
+1 - pchisq(cdc_chi, 11)
+```
+
+Since our computed p-value of 0.3058 is greater than alpha at level 0.05, we fail to reject our null hypothesis. We do not have enough evidence to conclude a difference in distribution between the Birthdays of famous Basketball Players and the overall distribution of birthdays given by the cdc. 
+
+## F. Interpret Your Results
+```{r}
+((new_Bday_freq$Freq - cdc.e)^2)/cdc.e
+```
+Based on the results from the two previous Chi Squared tests, using a significance level of 0.05, there isn't enough evidence to say that there is a significant difference between the Basketball player birthdays and the cdc's proportions of birthdays throughout the year. Although there seems to be a slightly higher proportion of Basketball players born in February than computed in the cdc statistics, it isn't enough evidence to conclude any difference in birthdays in the early part of the year, especially since the other early months barely show a difference. 
+
+# Question 3: Selltimes Data
+## A. Plot a Histogram
+```{r}
+hist(sells, breaks = 300, xlab = "time")
+hist(sells[sells<1], breaks = 50, xlab = "time")
+```
+
+## B. Calculate MLE (xbar)
+```{r}
+xbar <- mean(sells)
+mle <- xbar^(-1)
+mle
+```
+
+## C. divide sample space into 10 intervals 
+```{r}
+use_breaks <- c(qexp(seq(0, 0.9, by = 0.1), mle), 2400) 
+use_breaks #percentiles by 10% starting from 0 and including 100%
+cdf.vals <- pexp(use_breaks[c(-1, -11)], mle) # proof of equal quantile sizes
+exp_int <- (c(cdf.vals, 1)-c(0,cdf.vals))*length(sells)
+exp_int # equal expectations all above 5 !
+```
+
+## D. Count the number of observations in each of those intervals
+```{r}
+new_hist <- hist(sells, breaks = as.vector(use_breaks), plot = FALSE)
+new_counts <- new_hist$counts
+new_counts
+```
+
+## E. Perform the appropriate Chi Squared Test
+```{r}
+exp_counts <- sum(new_counts)/10
+chi_sells <- sum(((new_counts - exp_counts)^2)/exp_counts)
+chi_sells
+1 - pchisq(chi_sells, 8)
+```
+
+Ho: sell times is exponentially distributed
+H1: sell times is not exponentially distributed
+
+With a p-value very close to 0, less than alpha = 0.05, we reject the null hypothesis. There is significant evidence that the selltimes does not follow the exponential distribution. 
+
+## F. Inspect counts and expected values and give description of comparison with exponential distribution
+
+```{r}
+barplot(new_counts)
+abline(h = 30.9, col = "Red")
+```
+Looking at the graph above representing the observed and expected values for counts within an interval, we can see that it does a poor job of following the exponential distribution. An exponential distribution is always strictly decreasing, and neither form shows that kind of trend. The Observed values show a large decrease from the first interval to the second interval, but fluctuations between the rest of the intervals and ending with an increase in the last interval. Comparing those findings with the equal expectations we get from part c, it is quite apparent that the intervals do a bad job of creating correct percentiles.    
+
+
+## G. Experiment with the different sets of intervals
+```{r}
+# 25 breaks
+use_breaks25 <- c(qexp(seq(0, (24/25), by = (1/25)), mle), 2400) 
+print("Dividing space into 25 intervals")
+use_breaks25 #percentiles by 4% starting from 0 and including 100%
+cdf.vals25 <- pexp(use_breaks25[c(-1, -26)], mle) # proof of equal quantile sizes
+exp_int25 <- (c(cdf.vals25, 1)-c(0,cdf.vals25))*length(sells)
+print("Equal Expectations for 25 intervals")
+exp_int25 # equal expectations all above 5 !
+
+new_hist25 <- hist(sells, breaks = as.vector(use_breaks25), plot = FALSE)
+new_counts25 <- new_hist25$counts
+print("Number of Counts in Each of the 25 intervals")
+new_counts25
+
+exp_counts25 <- sum(new_counts25)/25
+chi_sells25 <- sum(((new_counts25 - exp_counts25)^2)/exp_counts25)
+print("Chi Squared Statistic:")
+chi_sells25
+print("p-value:")
+1 - pchisq(chi_sells25, 23)
+```
+
+```{r}
+# 100 breaks
+use_breaks100 <- c(qexp(seq(0, (99/100), by = (1/100)), mle), 2400) 
+print("Dividing space into 100 intervals")
+use_breaks100 #percentiles by 1% starting from 0 and including 100%
+cdf.vals100 <- pexp(use_breaks100[c(-1, -101)], mle) # proof of equal quantile sizes
+exp_int100 <- (c(cdf.vals100, 1)-c(0,cdf.vals100))*length(sells)
+print("Equal Expectations for 100 intervals")
+exp_int100 # equal expectations all above 5 !
+
+new_hist100 <- hist(sells, breaks = as.vector(use_breaks100), plot = FALSE)
+new_counts100 <- new_hist100$counts
+print("Number of Counts in Each of the 100 intervals")
+new_counts100
+
+print("Cannot Perform Chi-Squared Test Since the Conditions Are Not Satisfied")
+```
+
+The benefit of having more bins means that there is more power; however, with less bins, we are able to be more precise with our conclusions.By increasing the intervals to 25 and then to 100, we see that the expected number of counts per interval gets smaller. At 25, it gets to approximately 12 counts and then drops down to 3 counts for 100 intervals. The overall distribution of counts for using 25 and 100 intervals drops lower too, especially for the middle section of the distribution. Since our expectation for 100 intervals falls below 4, it is not valid to perform a Chi-Squared test. Based on the previous Chi-Squared Test results for 10 and 25 intervals, it seems as though the Chi-Squared value would consistently increase and the p-value decrease. So regardless of whether or not we add more intervals, it is safe to say that the data does not follow an exponential distribution.
+

@@ -1,0 +1,264 @@
+---
+title: "HW3"
+author: "Alyssa Keehan"
+date: "1/23/2021"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(xml2)
+library(rvest)
+#install.packages("nortest")
+library(nortest)
+library(dplyr)
+library(ggplot2)
+#install.packages('lubridate')
+library(lubridate)
+library(readr)
+```
+
+# Question 1
+## A. Plot and Compare Empirical and Beta CDF
+```{r}
+grades <- c(0.4, 0.717,0.817,0.833,0.933,0.975)
+plot(c(0,grades,1),c(seq(0,1,by=1/6),1), type = 's', lwd = 2, col = 4, xlab = 'score', ylab = 'cdf')
+xs <- seq(0,1,length = 300)
+lines(xs, pbeta(xs, shape1 = 6, shape2 = 2), col = 2)
+```
+
+## B. Draw a Plot  of Function G(n)
+```{r}
+unif_grades <- pbeta(grades, shape1 = 6, shape2 = 2)
+plot(c(0,rep(unif_grades, each = 2),1),rep(seq(0,1,by=1/6),each=2) - c(0,rep(unif_grades, each = 2),1), type = 'l', lwd = 2, col = 3, xlab = "Grade", ylab = "G(t)")
+```
+
+## C. Use ks.test function to test the null hypothesis that data follows Beta(6,2)
+```{r}
+ks.test(grades, "pbeta", 6,2)
+```
+Ho: The data follows a Beta Distibution
+
+H1: The data does not follow a Beta Distribution
+
+p-value : 0.5955
+
+## D. Conclusion
+With a p-value of 0.5955, we fail to reject the null hypothesis. We do not have enough statistically significant evidence to state that the data does not follow a Beta Distribution. 
+
+## E. Why would it be difficult to apply a X^2 test to this data?
+Since our sample size is small, we cannot divide our data into multiple bins where the expectation is greater than or equal to 5. In addition, the expectation for a beta distribution is a / (a + b) which is always smaller than 1. Since these are the cases, we wouldnt be able to perform a valid Chi-Squared test. 
+
+# Question 2
+```{r}
+earthquakes <- read_csv("EarthquakeData.htm", skip = 13)
+hrs <- c()
+min <- c()
+sec <- c()
+mil <- c()
+for(i in 1:nrow(earthquakes)){
+  if(is.na(earthquakes$`Time(hhmmss.mm)UTC`[i]==TRUE)){
+    earthquakes$Time[i]= NA
+  }
+  else {
+    hrs[i]= as.numeric(substr(earthquakes$`Time(hhmmss.mm)UTC`[i],1,2))
+    min[i]= as.numeric(substr(earthquakes$`Time(hhmmss.mm)UTC`[i],3,4))
+    sec[i]= as.numeric(substr(earthquakes$`Time(hhmmss.mm)UTC`[i],5,6)) 
+    mil[i]= as.numeric(substr(earthquakes$`Time(hhmmss.mm)UTC`[i],8,9))  
+    if (is.na(mil[i])){
+      earthquakes$Time[i] = hrs[i] + (min[i]/60) + (sec[i]/(60*60))
+    }else {
+    earthquakes$Time[i] = hrs[i] + (min[i]/60) + (sec[i]/(60*60)) + mil[i]/(1000*60*60)
+    }
+  }
+}
+earthquakes
+```
+
+## A. Plot a histogram with bars 15 minutes in length
+
+```{r}
+times <- earthquakes$Time
+hist(times, breaks = 96, border = "black", col = "blue") # 96 because 60 minutes in 24 hours and 15 * 4 = 60
+```
+
+## B. Chi- Squared to determine unifomity amongst the hours of the day
+```{r}
+hourly <- hist(times, breaks = seq(0,24), plot = FALSE)
+hour_frq <- hourly$counts
+exp_freq_mon <- mean(hour_frq) # 76.0833
+chi_hour <- sum(((hour_frq - exp_freq_mon)^2)/exp_freq_mon)
+chi_hour
+pchisq(chi_hour, 23, lower.tail = FALSE)
+# just to check
+chisq.test(hour_frq, p = rep((1/24),24))
+```
+Ho: The frequency of earthquakes is Uniformly Distributed throughout the day
+
+H1: The frequency of earthquakes is not Uniformly Distributed throughout the day.
+
+With a p-value of 0.8267 greater than alpha = 0.05, we fail to reject the null hypothesis. There is not significant enough evidence to conclude a difference between the frequencies of Earthquakes throughout the day. 
+
+
+## C. Calculate KS Test Statistics
+```{r}
+sorted_times <- sort(times)
+time_cdf <- punif(sorted_times, 0, 24)
+emp1 <- seq(0,1-(1/length(sorted_times)), by = 1/length(sorted_times))
+emp2 <- seq(1/length(sorted_times),1, by = 1/length(sorted_times))
+d1 <- max(time_cdf - emp1)
+d2 <- max(emp2 - time_cdf)
+d1
+d2
+# just to test
+ks.test(sorted_times, 'punif', 0,24)
+```
+The Dplus test statistic is 0.01263262.
+
+The Dminus test statistic is 0.0133862.
+
+Therefore we would set the test statistic D to be equal to 0.0133862.
+
+## D. Calculate a p-value
+```{r}
+d <- max(d1,d2)
+ks_p <- 0
+use_p <- 0 
+for (i in c(1:4)){
+  use_p <- use_p + 2*((-1)^(i+1))*exp((-2*i^(2))*(sqrt(length(sorted_times))*d)^2)
+}
+use_p
+```
+Ho: The frequency of earthquakes is Uniformly Distributed throughout the day
+
+H1: The frequency of earthquakes is not Uniformly Distributed throughout the day.
+
+Based on the result above, since our p-value of 0.89903 is greater than alpha = 0.05, we fail to reject the null hypothesis. There is not significant enough evidence to conclude that the data does not follow a uniform distribution. 
+
+
+# Question 3
+```{r}
+shoulder_raw <- read.table("shoulder.txt")
+shoulder <- shoulder_raw %>% filter(V1 != "Shoulder" & V2 != "Gender")
+colnames(shoulder) <- c("Width", "Gender")
+shoulder$Width <- as.numeric(shoulder$Width)
+head(shoulder)
+```
+## A. Plot a Histogram
+```{r}
+mean_width <- mean(shoulder$Width)
+sd_width <- sd(shoulder$Width)
+min_width <- min(shoulder$Width) # 85.9
+max_width <- max(shoulder$Width) # 134.8
+seqsee <- seq(80, 140, length = 50)
+ggplot(data = shoulder, aes(x = Width, after_stat(density))) +
+  geom_histogram(bins = 30, fill = "wheat", col = "purple") +
+  annotate(geom = "line", x = seqsee, y = dnorm(seqsee, mean = mean_width, 
+                  sd = sd_width), size = 1.25, col = "blue")
+```
+
+## B. Use Multiple Tests to Determine Whether or Not the Data Follows a Normal Distribution
+```{r}
+# lillie
+lillie.test(shoulder$Width)
+# cvm
+cvm.test(shoulder$Width)
+# ad
+ad.test(shoulder$Width)
+```
+Ho: The data follows a Normal Distribution
+
+H1: The data does not follow a Normal Distribution
+
+Using all 3 tests, we get very low p-values less than alpha = 0.05 and therefore reject the null hypothesis. There is significant evidence to conclude that the data is not from a Normal Distribution.
+
+# C. Retest with Separate Groups for Men and Women
+```{r}
+men <- shoulder %>% filter(Gender == "Male")
+women <- shoulder %>% filter(Gender == "Female")
+
+# All three tests on Men
+lillie.test(men$Width)
+cvm.test(men$Width)
+ad.test(men$Width)
+
+# All three tests on Women
+lillie.test(women$Width)
+cvm.test(women$Width)
+ad.test(women$Width)
+```
+
+Based on the results after separating by gender, we are getting high p-values greater than alpha = 0.05 for just the men and very low p-values less than alpha = 0.05 for women. Looking at just the shoulder data for men, we fail to reject the null hypothesis and conclude there is not enough significant evidence to confidently state that the shoulder width data for men doesn't follow a Normal Distribution. On the other hand, looking at the shoulder data for women, we reject the null hypothesis. We have significant evidence to conclude that the shoulder width data for women does not follow a Normal Distribution. 
+
+# D. Combine the Men and Women Data
+```{r}
+mean_men <- mean(men$Width)
+mean_women <- mean(women$Width)
+st_men <- men$Width - mean_men
+st_women <-  women$Width - mean_women
+st_width <- c(st_men,st_women)
+hist(st_width, breaks = 30, border = 'purple',col = 'wheat')
+lillie.test(st_width)
+cvm.test(st_width)
+ad.test(st_width)
+```
+Looking at the results above after we attempted to standardize and combine both the men and women shoulder width sizes, we are receving p-values smaller than alpha = 0.05. With that knowledge, we can reject the null hypothesis and conclude that there is significant evidence that tells us the data does not follow a Normal Distribution. 
+
+## E. Do you think it would be reasonable to use a Two-Sample T-test?
+In order to compute a successful 2-sample T-Test, we need to fulfill the assumptions that both samples follow a normal distribution. In the step before, we concluded that the distribution of female shoulder widths does not follow a normal distribution. Therefore it would not be reasonable to use a two-sample T-test since the separated data don't both follow a normal distribution. 
+
+# Question 4
+## Are basketball player birthdays uniformly distributed?
+
+```{r}
+bdays <- read.table("BBallBDays.txt")
+bdays$Month <- factor(bdays$Month, levels = month.name)
+bdays$month <- as.numeric(bdays$Month)
+bdays <- na.omit(bdays)
+# months now with numeric values
+head(bdays)
+```
+```{r}
+# convert all the months to days in a year 
+for(i in 1:nrow(bdays)){
+  if(bdays$month[i]== 1){
+    bdays$totaldays[i]= bdays$Day[i]} 
+  else if(bdays$month[i] == 2) {
+     bdays$totaldays[i]= 31 + bdays$Day[i]}
+   else if(bdays$month[i] == 3){
+     bdays$totaldays[i]= 31 + 28.25 + bdays$Day[i]} 
+  else if(bdays$month[i] == 4) {
+    bdays$totaldays[i]= 31*2 + 28.25 + bdays$Day[i]}
+  else if(bdays$month[i] == 5) {
+    bdays$totaldays[i]= 31*2 + 30 + 28.25 + bdays$Day[i]}
+  else if(bdays$month[i] == 6) {
+    bdays$totaldays[i]= 31*3 + 30 + 28.25 + bdays$Day[i]}
+  else if(bdays$month[i] == 7) {
+    bdays$totaldays[i]= 31*3 + 30*2 + 28.25 + bdays$Day[i]}
+  else if(bdays$month[i] == 8) {
+    bdays$totaldays[i]= 31*4 + 30*2 + 28.25 + bdays$Day[i]}
+  else if(bdays$month[i] == 9) {
+    bdays$totaldays[i]= 31*5 + 30*2 + 28.25 + bdays$Day[i]}
+  else if(bdays$month[i] == 10) {
+    bdays$totaldays[i]= 31*5 + 30*3 + 28.25 + bdays$Day[i]}
+  else if(bdays$month[i] == 11) {
+    bdays$totaldays[i]= 31*6 + 30*3 + 28.25 + bdays$Day[i]}
+  else{
+    bdays$totaldays[i]= 31*6 + 30*4 + 28.25 + bdays$Day[i]}
+}
+sort_bdays <- sort(bdays$totaldays)
+ks.test(sort_bdays, 'punif', 1, 365.25)
+```
+Ho: The Basketball Birthdays follow a Uniform Distribution
+
+H1: The Basketball Birthdays do not follow a Uniform Distribution
+
+With a p-value of 0.5528 greater than alpha = 0.05, we fail to reject the null hypothesis. There is not enough statisticaly significant evidence to conclude that Basketball Player Birthdays do not follow a Uniform Distribution.
+
+
+
+
+
+

@@ -1,0 +1,120 @@
+---
+title: "PSTAT 105: HW4"
+author: "Alyssa Keehan"
+date: "2/11/2021"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(MASS)
+library(ggplot2)
+library(dplyr)
+library(base)
+```
+
+# Question 3
+## A. plot a histogram with a reasonable amount of bins
+```{r}
+waiting <- geyser$waiting
+seqsee <- seq(40,110, length = 50)
+ggplot(data = geyser, aes(x = waiting, after_stat(density))) +
+geom_histogram(bins = 40, fill = "wheat", col = "purple")
+```
+
+## B. Plot histogram again but with the Mixture Density
+```{r}
+use_int <- seq(40, 110, by = 1)
+phi1 <- dnorm(use_int, mean = 52, sd = 7)
+phi2 <- dnorm(use_int, mean = 80, sd = 7)
+mix_dens <- phi1/3 + (2*phi2)/3
+hist(waiting,breaks = 50, freq = FALSE, col = "wheat", border = "purple")
+lines(use_int, mix_dens)
+```
+
+## C. Does this mixture Density fit well?
+I think overall, the density curve does a good job of showing the curvature of the data. The densities are closest mainly in the second hill, especially when the values are rising. The mixture density underestimates the values where the density on the histogram is shown to be high. Meanwhile, the density function slightly overestimates the dips.If we increase the number of bins in the histogram, we see that the mixture curve would be even more inconsistent with the furriness of the data. Although the curve matches the trend very well, the fit is not the best as it isn't consistent with the data throughout the distribution. 
+
+## D. Use K.S. test to see if it fits the data well. 
+```{r}
+sorted_waiting <- sort(waiting)
+# write a function to input into the ks.test function
+mixture_cdf <- function(q){
+  cdf <- pnorm(q, 52, 7)/3 + 2*pnorm(q,80,7)/3
+  return(cdf)
+}
+ks.test(sorted_waiting, mixture_cdf)
+```
+With a p-value = 0.0385 greater than alpha = 0.05, we reject the null hypothesis. We have enough evidence to conclude a difference between the mixture function and the waiting time distribution. It looks as though our result is very close to failing to reject that the mixture density fits the geyser data. Like I said before in the part before, the mixture function does a good job of following the trend, but overestimates the smoothness of the raw data. So it makes sense that the result is close, but also undeniably concluding that we reject the null hypothesis. 
+
+# Question 4
+```{r}
+snow_raw <- scan('snow.txt')
+snow <- as.data.frame(snow_raw)
+head(snow)
+```
+
+## A. Draw a Histogram that shows the details of the distribution of the data
+```{r}
+hist(snow$snow_raw, breaks = 150, freq = FALSE, col= "grey", border = "blue", ylim = c(0,0.003))
+```
+
+## B. Estimate the density of the distribution at the value of 2000 inches and Give a 95% confidence interval for this measurement.
+```{r}
+bw <- 100
+phat <- mean(snow > (2000-bw/2) & snow < (2000+bw/2))
+fhat <- phat/bw 
+fhat # approx denisty at values 2000
+use_range <- phat*(1-phat)/(499*bw^2)
+low <- fhat + -1.96*sqrt(use_range)
+high <- fhat + 1.96*sqrt(use_range)
+c(low, high)
+```
+Using a bandwidth of 100, we are 95% confident that the density of our distribution at the value 2000 inches is between 0.0000371 and 0.000243. We can justify this bandwidth since 0 is not included in this interval. 
+
+## C.  Estimate the probaility that the station never sees snow
+```{r}
+ecdf(snow$snow_raw)(0) # cdf is probability since 0 is the lowest values
+nrow(snow %>% filter(snow_raw == 0))/499 # checking with the actual distribution
+```
+The probability that the station never sees snow is approximately 0.367
+
+## D. Estimate a density over the data greater than 0 and show it on a histogram.
+```{r}
+snow_no_zero <- snow %>% filter(snow_raw > 0)
+hist(snow_no_zero$snow_raw, breaks = 50, freq = FALSE, col = "grey", border = "blue", ylim = c(0,0.003))
+nozero_dens1 <- density(snow_no_zero$snow_raw, bw = 40, kernel = "gaussian")
+lines(nozero_dens1, col = "black", lw = 5)
+nozero_dens2 <- density(snow_no_zero$snow_raw, bw = 50, kernel = "gaussian")
+lines(nozero_dens2, col = "pink", lw = 4)
+nozero_dens5 <- density(snow_no_zero$snow_raw, bw = 100, kernel = "gaussian")
+lines(nozero_dens5, col = "purple", lw = 3)
+nozero_dens3 <- density(snow_no_zero$snow_raw, bw = 120, kernel = "gaussian")
+lines(nozero_dens3, col = "green", lw = 2)
+nozero_dens4 <- density(snow_no_zero$snow_raw, bw = 250, kernel = "gaussian")
+lines(nozero_dens4, col = "red", lw = 1)
+legend(4000, 0.0025, legend = c("40","50","100","150","250"), 
+       col = c("black","pink","purple","green","red"), lwd = rep(4,4),
+       title = "Bandwidths")
+```
+Based on my results above, 40 looks like it fits the data best.
+
+## E. Can you give an educated guess as to how much bias is present in your answer to part B. ?
+```{r}
+nrow(snow %>% filter(snow_raw > 1980 & snow_raw < 2020)) # 40 is the smallest possible bandwidth
+# checking with a smaller bandwidth
+bwsmall <- 40
+phatsmall <- mean(snow > (2000-bwsmall/2) & snow < (2000+bw/2))
+fhatsmall <- phatsmall/bwsmall 
+fhat - fhatsmall # comparing fhat with 100 bw to fhat with 50 bw
+```
+As our bandwidth decreases, our bias also decreases. In order to estimate our bias, we look at the difference between the fhat from our computation in part b and our fhat of the smallest possible bandwidth estimation (fhat_100(2000) - fhat_50(2000)). Since our difference is very small, we can conclude that there is little bias in the bandwidth of 100 around 2000. 
+
+
+
+
+
+
+

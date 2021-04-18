@@ -1,0 +1,205 @@
+---
+title: "HW7"
+author: "Alyssa Keehan"
+date: "3/8/2021"
+output: 
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Question 1
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(KernSmooth)
+andro2 <- read.csv("andro2.txt", sep = " ")
+```
+## A. Esimate the value of the mean function at time 200 by first averaging the 35 points closest to that time, and then average the 105 points closest to time 200. Give 95% confidence intervals for each of these estimates using a t statistic and estimating the variance from the data used in the mean.
+```{r}
+andro2$dist_200 <- abs(andro2$Time -200)
+
+# closest 35 points
+andro2_35 <- andro2 %>% arrange(dist_200) %>% top_n(-35, dist_200)
+xbar35 <- mean(andro2_35$Signal)
+t35 <- qt(0.975, 34)
+s35 <- sum((andro2_35$Signal - xbar35)^2)/34
+xbar35 + c(-t35, 0, t35)*sqrt(s35/35)
+
+# closest 105 points
+andro2_105 <- andro2 %>% arrange(dist_200) %>% top_n(-105, dist_200)
+xbar105 <- mean(andro2_105$Signal)
+t105 <- qt(0.975, 104)
+s105 <- sum((andro2_105$Signal - xbar105)^2)/104
+xbar105 + c(-t105, 0, t105)*sqrt(s105/105)
+```
+
+Using the mean of the 35 values closest to time 200, we get a 95% confidence interval of signals between -0.01238412 and 0.05752698. Similarly, using the mean of the 105 values closest to the time 200, we get a 95% confidence interval of signals between -0.04493283 and -0.01716240. 
+
+## B. In measuring the performance of a nonparametric regression estimator, we are looking at the variance and the bias of the estimate. Which of these two is not accounted for in your 95% confidence intervals from part (a)? Explain.
+
+The only one of the two that are accounted for in the 95% confidence interval is the variance. This is because the confidence interval is directly calculated using the variance measurement. The margin of error isn't directly affected by the bias unlike the variance, so bias isn't accounted for in the confidence interval. In addition, since 0 is included in the confidence interval with just 35 close observations, bias isn't accounted for in calculation. 
+
+## C. Plot the data with time as the x axis and signal as the y axis. Calculate the Nadaraya-Watson kernel estimate using a Gaussian kernel, and plot the resulting estimate of a smooth mean function. Use a bandwdith that you think works well.
+```{r}
+kest <- ksmooth(andro2$Time, andro2$Signal, kernel = "normal", bandwidth = 4)
+kest_df <- data.frame(kest$x, kest$y)
+sig <- ggplot(andro2, aes(x=Time, y = Signal)) + geom_point()
+sig + geom_line(data = kest_df, aes(x=kest.x, y=kest.y), col = "red")
+```
+
+I chose a bandwidth of 4 for this smooth mean function because it highlights the peaks and dips without being too furry. If I increased the bandwidth anymore, the heights of each peak would be simplified and not presented accurately.
+
+## D.Make a new scatter plot and then add a local linear regression estimate using the locpoly function from the KernSmooth library. Choose a new bandwidth that fits the data well.
+```{r}
+locest <- locpoly(andro2$Time, andro2$Signal, kernel = "normal", bandwidth = 2)
+locest_dat <- data.frame(locest$x, locest$y)
+sig + geom_line(data = locest_dat, aes(x = locest.x, y = locest.y), col = "blue")
+```
+
+Just like with my histogram from part c, I chose a bandwidth of 2 because it highlights the peaks and dips enough to wear they are shown, but not to the point where it is too furry. Similary, if I made the bandwidth any bigger, the heights of each peak corresponding to a signal value would be uniform and the differences indistinguishable. 
+
+## E. The scientists were looking at these measurements for evidence of a sequence of peaks in the levels happening regularly over time. Use your estimates of the mean functions to locate the peaks in the data stream, and calculate the average amount of time between the peaks.
+```{r}
+locestE <- locpoly(andro2$Time, andro2$Signal, kernel = "normal", bandwidth = 15)
+locest_datE <- data.frame(locestE$x, locestE$y)
+sig + geom_line(data = locest_datE, aes(x = locestE.x, y = locestE.y), 
+                col = "green")
+```
+```{r}
+use_sigs <- locest_datE$locestE.y
+use_time <- locest_datE$locestE.x
+peaks_ind <- which(diff(sign(diff(use_sigs)))==-2)+1
+dists <- c()
+for (i in c(1:(length(peaks_ind)-1))){
+  dists[i] <- use_time[peaks_ind[i+1]] - use_time[peaks_ind[i]]
+}
+mean(dists)
+```
+I decided to use a bandwidth of 15 to identify the peaks because although it doesn't show the height of the peaks well, if shows where the main peaks are which is what I am focused on for this part of the question. Using the bandwidth of 15, there are approximately 10 peaks each about 67.74075 time measurements apart.
+
+# Question 2
+## Use a simulation of one million random trials to approximate the probability for an exponential random variable X with E(X) = 1 of the event A = {cos(X) > 0.7}. Calculate a margin of error for this approximation by using 95% confidence interval from a binomial experiment.
+```{r}
+set.seed(1)
+D <- 100
+N <- 10000
+samples <- c()
+phats <- c()
+for(i in c(1:D)){
+  samples[[i]] <- rexp(N,rate = 1)
+  phats[i] <- mean(cos(samples[[i]]) > 0.7)
+}
+phat <- mean(phats)
+ci <- phat +c(-1.96,0, 1.96)*sqrt(phat*(1-phat)/(10^6))
+ci
+moe <- (ci[3] - ci[1])/2
+moe
+```
+
+We are 95% confident that the true probability of event A occuring where X follows an exponential distribution is between 0.5507763 and 0.5527257. The margin of error from the calculated phat (0.551751) is approximately 0.0009747. 
+
+# Question 3
+## Generate 1000 samples where each consists of 50 independent exponential random variables with mean 1. Estimate the mean of each sample. Draw a histogram of the means.
+```{r}
+set.seed(2)
+samps <- c()
+mu <- c()
+for (i in c(1:1000)){
+  samps[[i]] <- rexp(50, rate = 1)
+  mu[i] <- mean(samps[[i]])
+}
+hist(mu, breaks = 50, col = "wheat", border = "purple", 
+     main = "1000 samples of the means of 50 Exponential Random Variables")
+```
+
+## B. Perform a KS test on each sample against the null hypothesis that they are from an exponential random variable with a mean that matches the mean of the data set. Draw a histogram of the 1000 values of D.
+```{r}
+set.seed(4)
+Ds <- c()
+for (i in c(1:1000)){
+  Ds[i] <- ks.test(samps[[i]], 'pexp', mu[i])$statistic
+}
+hist(Ds, breaks = 50, col = "wheat", border = "purple", 
+     main = "Histogram of 1000 values of D")
+```
+
+## C. From the simulated values of D, find an critical value c such that only 5% of the time will the test statistic D exceed that critical value.
+```{r}
+c <- quantile(Ds, 0.95)
+c
+```
+The critical value of the test statistic D such that only 5% of the time D will exceed it is 0.2742
+
+## D. Write up R code that will perform multiple batches of 1000 samples each consisting of 50 independent draws. Decide how many batches your computer can run in two hours, and run the program. Use the results to generate a more accurate estimate of c.
+```{r, eval = FALSE}
+# B_1number of batches = 1
+B_1 <- 1
+c = NULL 
+D = matrix(nrow = B_1, ncol=1000)
+a = Sys.time()
+for(i in 1:B_1){
+  samples = list()
+  for (j in 1:1000){
+    samples[[j]] = rexp(50,1)
+    D[i,j] = ks.test(samples[[j]], "pexp", mean(samples[[j]]))$statistic
+  }
+  c[i] = quantile(D[i,],0.95)
+}
+b=Sys.time()
+a-b # Time difference of -0.7305119 secs
+mean(c) # 0.2647861
+```
+Time Difference of -0.7305119 secs
+[1] 0.2647861
+
+Using just one batch took approximately 0.7305119 seconds and I recieved a mean critical value of 0.2647861.
+
+```{r, echo=TRUE, warning=FALSE, eval = FALSE}
+# number of batches for 2 hours
+(2*60*60)/0.7305119 # 9856.102
+
+# number of batches - round down to 2
+B_4 <- 9500
+c2 = NULL 
+D2 = matrix(nrow = B_4, ncol=1000)
+a2 = Sys.time()
+for(i in 1:B_4){
+  samples = list()
+  for (j in 1:1000){
+    samples[[j]] = rexp(50,1)
+    D2[i,j] = ks.test(samples[[j]], "pexp", mean(samples[[j]]))$statistic
+  }
+  c2[i] = quantile(D2[i,],0.95)
+}
+b2=Sys.time()
+a2-b2 # Time difference of -47.20445 mins
+mean(c2) # 0.2679361
+```
+Time difference of 47.20445 mins
+[1] 0.2679361
+
+Based on the results above, 9500 batches is supposed to take approximately 2 hours; however, the time only took about 50 minutes. Since the simulations seem to not be uniform at all and very inconsistent, it is hard to calculate the exactly number of batches needed to run for a total of 2 hours. Using basical algebra and my result above for time and number of batches, it would take approximately 10,800 batches to run for 2 hours. But looking at my result for mean critical value with 9500 batches, it is still very consistent with the first batch at around 0.26-0.27. As the number of batches increase, the more likely the mean critical values calculated will be closer to the true average of the data.
+
+## E. Calculate the critical value that is suggested in Table 1.4 of Stephens(1974) paper. Compare this to the results from your simulations. Do you think this value is significantly different from your simulation results?
+```{r}
+useD <- 1.094
+stephens <- (useD / (sqrt(1000) + 0.26 + (0.5/sqrt(1000)))) + (0.2/1000)
+stephens
+```
+Ho: Stephens calculated test statistic is equal to simulation results.
+
+H1: Stephens calculated test statistic is not equal to simulation results.
+
+Critical value of simulation 0.2679361 > stephens critical value = 0.03449619, therefore reject Ho.
+
+With a test statistic (0.2679361) greater than the the stephens critical value 0.03449619, we reject the null hypothesis. There is significant evidence that the stephens critical valuse is statistically different from the value created from the simulations. 
+ 
+
+
+
+
